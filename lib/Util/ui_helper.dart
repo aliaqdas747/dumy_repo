@@ -117,8 +117,7 @@ VoidCallback voidCallback,
 
 
   //Button
-  static CustomBtn(
-      VoidCallback voidCallback ,String text){
+  static CustomBtn(VoidCallback voidCallback ,String text){
     return  InkWell(
 
       onTap: voidCallback,
