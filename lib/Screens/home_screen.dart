@@ -1,12 +1,15 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dumy_app/Util/ui_helper.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:uuid/uuid.dart';
 
 class home_screen extends StatefulWidget {
   const home_screen({super.key});
@@ -19,9 +22,10 @@ class _home_screenState extends State<home_screen> {
   TextEditingController nameController = TextEditingController();
   TextEditingController emailController = TextEditingController();
   TextEditingController ageController = TextEditingController();
+  ///Your selected image is store in profilepic .
   File? profilepic;
 
-  void saveUser() {
+  void saveUser() async{
     String name = nameController.text.trim();
     String email = emailController.text.trim();
     String ageString = ageController.text.trim();
@@ -33,17 +37,36 @@ class _home_screenState extends State<home_screen> {
     emailController.clear();
     ageController.clear();
 
-    if (name != "" && email != "" && age != "") {
-      //In this code the name of Map is userData
-      //
+    if (name != "" && email != "" && age != "" && profilepic != null) {
+      ///FirebaseStorage.instance.ref(): Yeh Firebase Storage ke root ka reference hasil karta hai.
+      ///.child("profilepictures"): Yeh specify karta hai ke "profilepictures" naam se ek child directory root mein banaye jaye.
+      ///.child(Uuid().v1()): Yeh Uuid package ka istemal karke ek unique identifier banata hai.
+      /// Isse amuman unique filenames ko ensure karne ke liye istemal hota hai.
+      /// .putFile(profilepic!): Yeh profilepic file ko Firebase Storage mein upload karta hai.
+      UploadTask uploadTask =
+      FirebaseStorage.instance.ref().child("profilepictures").child(Uuid().v1()).putFile(profilepic!);
+     StreamSubscription taskSubscription= uploadTask.snapshotEvents.listen((snapshot) {
+        double percentage = snapshot.bytesTransferred/snapshot.totalBytes
+        *100;
+        print(percentage.toString());
+      });
+
+       TaskSnapshot taskSnapshot = await uploadTask;
+     String downloadUrl= await   taskSnapshot.ref.getDownloadURL();
+     taskSubscription.cancel();
+
       Map<String, dynamic> userData = {
         "name": name,
         "email": email,
         "age": age,
+       "profilepic": downloadUrl,
         "SimpleArray": [name, email, age]
       };
       FirebaseFirestore.instance.collection("users").add(userData);
       print('User is Created');
+      setState(() {
+        profilepic= null;
+      });
     } else {
       // Handle empty name or email
     }
@@ -88,17 +111,28 @@ class _home_screenState extends State<home_screen> {
           child: Container(
             width: 400,
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+            //  mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                SizedBox(height: 100),
+                SizedBox(height: 10,),
                 InkWell(
                   onTap: () async {
-                    XFile? selectedImage = await ImagePicker()
-                        .pickImage(source: ImageSource.gallery);
-
+                    ///When the user Tap on the Avater
+                    ///Then this code will run .ImagePicker will pic image from source :ImageSource.gallery locaaly.
+                    ///And this File will store in (selectedImage) in the form of XFile .But this XFile will not Directly
+                    ///Show the image in UI .We will convert XFile to File
+                    XFile? selectedImage = await ImagePicker().pickImage(source: ImageSource.gallery);
+                    ///In this code when the user select img this condition check Is
+                    ///the value of selectedImage not equal to null .
+                    ///If condion is true then the first code will
                     if (selectedImage != null) {
+                      ///In this first code The value of selectedImage now is equal to converted file(The file type will change into File)
+
                       File convertedFile = File(selectedImage!.path);
+                      ///After that we assigning the value profilepic is equal to  converted file
+                      ///converted file ma jo value or path ha wo ab profilepic ma store ho gya ha or setState call ho gai ha
+                      ///SetState jub call hoti ha to wo class ko rebuild krta ha .Or ui ko update krta ha ,
+
                       setState(() {
                         profilepic = convertedFile;
                       });
@@ -110,8 +144,10 @@ class _home_screenState extends State<home_screen> {
                   },
                   child: CircleAvatar(
                     radius: 50,
-                    backgroundImage:
-                        (profilepic != null) ? FileImage(profilepic!) : null,
+
+                    ///Agr profile image  null  nhi ha to jo image convert ho chukki ha or profilepic ma store ha
+                    ///to wo as a background image show ho jay gii.Agr null ha to Bg image bi null rhy gii.
+                    backgroundImage: (profilepic != null) ? FileImage(profilepic!) : null,
                     backgroundColor: Colors.grey,
                   ),
                 ),
@@ -131,7 +167,7 @@ class _home_screenState extends State<home_screen> {
                 ),
                 UiHelper.CustomBtn(() {
                   saveUser();
-                }, 'Save'),
+                }, 'Save' ?? 'loading...'),
                 SizedBox(height: 20),
                 StreamBuilder<QuerySnapshot>(
                   stream: FirebaseFirestore.instance
@@ -161,6 +197,9 @@ class _home_screenState extends State<home_screen> {
                                 ),
                                 child: ListTile(
                                   textColor: Colors.blue,
+                                  leading: CircleAvatar(
+                                    backgroundImage: NetworkImage(userMap["profilepic"]),
+                                  ),
                                   title: Text(
                                       userMap["name"] + "(${userMap["age"]})"),
                                   subtitle: Text(userMap["email"]),
