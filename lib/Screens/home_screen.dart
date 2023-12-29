@@ -39,21 +39,33 @@ class _home_screenState extends State<home_screen> {
 
     if (name != "" && email != "" && age != "" && profilepic != null) {
       ///FirebaseStorage.instance.ref(): Yeh Firebase Storage ke root ka reference hasil karta hai.
-      ///.child("profilepictures"): Yeh specify karta hai ke "profilepictures" naam se ek child directory root mein banaye jaye.
+      ///.child("profilepictures"): Yeh specify karta hai ke "profilepictures" naam se
+      /// ek child directory root mein banaye jaye.
       ///.child(Uuid().v1()): Yeh Uuid package ka istemal karke ek unique identifier banata hai.
       /// Isse amuman unique filenames ko ensure karne ke liye istemal hota hai.
       /// .putFile(profilepic!): Yeh profilepic file ko Firebase Storage mein upload karta hai.
-      UploadTask uploadTask =
-      FirebaseStorage.instance.ref().child("profilepictures").child(Uuid().v1()).putFile(profilepic!);
-     StreamSubscription taskSubscription= uploadTask.snapshotEvents.listen((snapshot) {
-        double percentage = snapshot.bytesTransferred/snapshot.totalBytes
-        *100;
+      ///
+      UploadTask uploadTask = FirebaseStorage.instance.ref().child("profilepictures").child(Uuid().v1()).putFile(profilepic!);
+    ///Next line will use to get  percentage of uploading image to firebase
+      // UploadTask ek future hota hai jo profile picture ko Firebase Storage mein upload karta hai.
+// Is task ki progress ko monitor karne ke liye ek StreamSubscription bana rahe hain.
+      StreamSubscription taskSubscription = uploadTask.snapshotEvents.listen((snapshot) {
+        // Yahan har event ke liye ham percentage nikal rahe hain,
+        // jo bytesTransferred ko totalBytes se divide karke milta hai, aur use 100 se multiply karte hain.
+        double percentage = snapshot.bytesTransferred / snapshot.totalBytes * 100;
+
+        // Yeh percentage ko string mein convert karke console par print karte hain.
         print(percentage.toString());
       });
 
-       TaskSnapshot taskSnapshot = await uploadTask;
-     String downloadUrl= await   taskSnapshot.ref.getDownloadURL();
-     taskSubscription.cancel();
+// Jab uploadTask complete ho jata hai, TaskSnapshot milta hai, isko await ke zariye wait kiya jata hai.
+      TaskSnapshot taskSnapshot = await uploadTask;
+
+// Upload complete hone ke baad, uploaded file ka download URL nikala jata hai.
+      String downloadUrl = await taskSnapshot.ref.getDownloadURL();
+
+// StreamSubscription ko cancel karte hain taki further progress events ko monitor karna band ho jaye.
+      taskSubscription.cancel();
 
       Map<String, dynamic> userData = {
         "name": name,
